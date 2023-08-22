@@ -31,15 +31,17 @@ class Program
             // Get config settings from AppSettings
             IConfigurationBuilder builder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
             IConfigurationRoot configuration = builder.Build();
+
+            // Get Cognitive Service settings
             cogSvcEndpoint = configuration["CognitiveServiceEndpoint"];
             cogSvcKey = configuration["CognitiveServiceKey"];
 
-            // Get config settings from Appsettings for Bot
+            // Get bot settings
             botEndpoint = configuration["BotEndpoint"];
             botKey = configuration["BotKey"];
 
 
-            // Set console encoding to unicode
+            // Set console encoding to Unicode
             Console.InputEncoding = Encoding.Unicode;
             Console.OutputEncoding = Encoding.Unicode;
         }
@@ -50,7 +52,7 @@ class Program
 
         try
         {
-            Console.WriteLine("Please ask a question about mental illness (exit to quit)");
+            Console.WriteLine("Ask a question about mental illness (type 'exit' to quit)");
 
             while (!exit)
             {
@@ -78,16 +80,16 @@ class Program
     {
         try
         {
-            // Create client using endpoint and key for the translation
+            // Create a client for translation using endpoint and key
             AzureKeyCredential credentials = new AzureKeyCredential(cogSvcKey);
             Uri endpoint = new Uri(cogSvcEndpoint);
             TextAnalyticsClient CogClient = new TextAnalyticsClient(endpoint, credentials);
 
-            // Get language
+            // Detect the language of the input question
             DetectedLanguage detectedLanguage = CogClient.DetectLanguage(question);
             var language = detectedLanguage.Iso6391Name;
 
-            // Translate if not already in English
+            // Translate the question if it's not already in English
             Console.Clear();
 
             if (language != "en")
@@ -99,6 +101,7 @@ class Program
             }
             else
             {
+                // If the question is already in English
                 Console.Write("You: " + question + "\n");
                 BotReply(question);
             }
@@ -128,12 +131,12 @@ class Program
                 request.Headers.Add("Ocp-Apim-Subscription-Key", cogSvcKey);
                 request.Headers.Add("Ocp-Apim-Subscription-Region", cogSvcRegion);
 
-                // Send the request and get response
+                // Send the translation request and parse the response
                 HttpResponseMessage response = await client.SendAsync(request).ConfigureAwait(false);
                 // Read response as a string
                 string responseContent = await response.Content.ReadAsStringAsync();
 
-                // Parse JSON array and get translation
+                // Parse the JSON response and extract the translation
                 JArray jsonResponse = JArray.Parse(responseContent);
                 translation = (string)jsonResponse[0]["translations"][0]["text"];
             }
@@ -146,15 +149,18 @@ class Program
 
     static void BotReply(string question)
     {
-        // Create client using endpoint and key for the bot
+        // Create a client for the bot using endpoint and key
         AzureKeyCredential credentialbot = new AzureKeyCredential(botKey);
         Uri botEndpointUri = new Uri(botEndpoint);
 
+        // Initialize the Question Answering client and project
         QuestionAnsweringClient client = new QuestionAnsweringClient(botEndpointUri, credentialbot);
         QuestionAnsweringProject project = new QuestionAnsweringProject(projectName, deploymentName);
 
+        // Query the bot for answers using the provided question
         Response<AnswersResult> respone = client.GetAnswers(question, project);
 
+        // Display the bot's answers
         foreach (KnowledgeBaseAnswer answer in respone.Value.Answers)
         {
             Console.WriteLine($"\nBot: {answer.Answer}\n");
